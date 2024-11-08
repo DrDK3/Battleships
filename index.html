@@ -102,8 +102,7 @@
     left: -25px;
     width: 100px;
     height: 100px;
-    background: url('https://i.imgur.com/6KZ4XJL.png') no-repeat center center;
-    background-size: contain;
+    background: radial-gradient(circle, rgba(255,255,0,1) 0%, rgba(255,0,0,0.8) 70%, rgba(255,0,0,0) 80%);
     animation: explode 0.5s ease-out forwards;
     pointer-events: none;
     z-index: 1;
@@ -148,17 +147,11 @@
   }
   /* Dashboard Shake Effect */
   @keyframes shake {
-    0% { transform: translate(1px, 1px) rotate(0deg); }
-    10% { transform: translate(-1px, -2px) rotate(-1deg); }
-    20% { transform: translate(-3px, 0px) rotate(1deg); }
-    30% { transform: translate(3px, 2px) rotate(0deg); }
-    40% { transform: translate(1px, -1px) rotate(1deg); }
-    50% { transform: translate(-1px, 2px) rotate(-1deg); }
-    60% { transform: translate(-3px, 1px) rotate(0deg); }
-    70% { transform: translate(3px, 1px) rotate(-1deg); }
-    80% { transform: translate(-1px, -1px) rotate(1deg); }
-    90% { transform: translate(1px, 2px) rotate(0deg); }
-    100% { transform: translate(1px, -2px) rotate(-1deg); }
+    0% { transform: translate(0px, 0px); }
+    25% { transform: translate(5px, -5px); }
+    50% { transform: translate(-5px, 5px); }
+    75% { transform: translate(5px, 5px); }
+    100% { transform: translate(0px, 0px); }
   }
   .shake {
     animation: shake 0.5s;
@@ -218,6 +211,27 @@
     font-size: 36px;
     margin-bottom: 20px;
   }
+  /* Player Sunk Overlay */
+  #player-sunk {
+    background-color: rgba(255, 0, 0, 0.9);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    z-index: 20;
+    color: #ffffff;
+    text-align: center;
+    padding: 20px;
+  }
+  #player-sunk h2 {
+    font-size: 36px;
+    margin-bottom: 20px;
+  }
   /* Play Again Button */
   .play-again-button {
     padding: 15px 30px;
@@ -259,6 +273,7 @@
     <li>Select three targets on the grid; after your final selection, hits and misses will be revealed.</li>
     <li>Ships are revealed only when they are completely sunk.</li>
     <li>The game ends when you have answered all questions and used all your shots.</li>
+    <li>If you answer incorrectly, you will be exposed to enemy ships and at risk of being hit yourself.</li>
   </ol>
   <p>Good luck, Commander!</p>
   <button id="start-button" onclick="startGame()">Start Game</button>
@@ -304,6 +319,11 @@
   <button class="play-again-button" onclick="restartGame()">Try Again</button>
 </div>
 
+<div id="player-sunk" class="overlay">
+  <h2>You have been hit by an enemy ship and sunk!</h2>
+  <button class="play-again-button" onclick="restartGame()">Try Again</button>
+</div>
+
 <script>
   // Game Variables
   let gridSize = 6;
@@ -336,6 +356,27 @@
     document.getElementById('instructions').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     initGame();
+  }
+
+  // Initialize Game
+  function initGame() {
+    initializeGrid();
+    placeShips();
+    createGridUI();
+    correctAnswersCount = 0;
+    incorrectAnswersCount = 0;
+    currentQuestionIndex = 0;
+    gameOver = false;
+    document.getElementById('correct-answers-count').innerText = correctAnswersCount;
+    document.getElementById('incorrect-answers-count').innerText = incorrectAnswersCount;
+    document.getElementById('feedback').innerText = '';
+    document.getElementById('salvo-instructions').innerText = '';
+    displayQuestion();
+
+    // Hide overlays if they were displayed
+    document.getElementById('celebration').style.display = 'none';
+    document.getElementById('failure').style.display = 'none';
+    document.getElementById('player-sunk').style.display = 'none';
   }
 
   // Initialize Grid
@@ -414,6 +455,8 @@
       document.getElementById('current-question-number').innerText = currentQuestionIndex + 1;
       document.getElementById('question').innerText = questions[currentQuestionIndex].question;
       document.getElementById('answer').value = '';
+      document.getElementById('answer').disabled = false;
+      document.getElementById('submit-answer-button').disabled = false;
       document.getElementById('feedback').innerText = '';
     } else {
       document.getElementById('question-area').innerHTML = '<h2>All questions answered.</h2>';
@@ -425,6 +468,11 @@
     if (currentQuestionIndex >= questions.length) return;
     let userAnswer = document.getElementById('answer').value.trim().toLowerCase();
     let correctAnswer = questions[currentQuestionIndex].answer.toLowerCase();
+
+    // Disable the answer input and submit button
+    document.getElementById('answer').disabled = true;
+    document.getElementById('submit-answer-button').disabled = true;
+
     if (userAnswer === correctAnswer) {
       shotsLeft = totalShotsPerSalvo;
       correctAnswersCount++;
@@ -433,12 +481,11 @@
       document.getElementById('salvo-instructions').innerText = 'Select ' + shotsLeft + ' targets on the grid.';
       selectedShots = [];
     } else {
+      // Game over - player sunk
       incorrectAnswersCount++;
       document.getElementById('incorrect-answers-count').innerText = incorrectAnswersCount;
-      document.getElementById('feedback').innerText = 'Incorrect. The correct answer was: ' + questions[currentQuestionIndex].answer;
-      document.getElementById('salvo-instructions').innerText = '';
-      currentQuestionIndex++;
-      displayQuestion();
+      gameOver = true;
+      displayEndGameMessage('sunk');
     }
   }
 
@@ -552,6 +599,9 @@
       let failureFeedback = document.getElementById('failure-feedback');
       failureFeedback.innerText = 'You answered ' + correctAnswersCount + ' out of ' + totalQuestions + ' questions correctly and sunk ' + countSunkShips() + ' out of ' + ships.length + ' ships.';
       failureOverlay.style.display = 'flex';
+    } else if (result === 'sunk') {
+      let playerSunkOverlay = document.getElementById('player-sunk');
+      playerSunkOverlay.style.display = 'flex';
     }
     document.getElementById('salvo-instructions').innerText = '';
     document.getElementById('question-area').innerHTML = '';
@@ -565,22 +615,6 @@
   // Restart Game Function
   function restartGame() {
     location.reload();
-  }
-
-  // Initialize Game
-  function initGame() {
-    initializeGrid();
-    placeShips();
-    createGridUI();
-    correctAnswersCount = 0;
-    incorrectAnswersCount = 0;
-    currentQuestionIndex = 0;
-    gameOver = false;
-    document.getElementById('correct-answers-count').innerText = correctAnswersCount;
-    document.getElementById('incorrect-answers-count').innerText = incorrectAnswersCount;
-    document.getElementById('feedback').innerText = '';
-    document.getElementById('salvo-instructions').innerText = '';
-    displayQuestion();
   }
 
   // Accessibility: Focus Management
