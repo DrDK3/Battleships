@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Performance Enablement Battleships</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  /* Global Styles */
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #0a0a0a;
+    color: #ffffff;
+    text-align: center;
+  }
+  h1, h2 {
+    color: #ffffff;
+  }
+  /* Instructions Styles */
+  #instructions {
+    background-color: #1c1c1c;
+    padding: 20px;
+    margin: 20px auto;
+    width: 80%;
+    max-width: 800px;
+    border-radius: 8px;
+    text-align: left;
+  }
+  #instructions h2 {
+    margin-top: 0;
+  }
+  #start-button {
+    padding: 15px 30px;
+    font-size: 18px;
+    background-color: #28a745;
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 20px;
+  }
+  #start-button:hover {
+    background-color: #218838;
+  }
+  /* Dashboard Styles */
+  #dashboard {
+    display: none; /* Hidden until the game starts */
+    padding: 20px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  #game-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+  }
+  #question-area, #grid-area, #feedback-area {
+    background-color: #1c1c1c;
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px;
+    flex: 1 1 300px;
+    max-width: 300px;
+  }
+  /* Grid Styles */
+  #grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(6, 50px);
+    grid-gap: 5px;
+    justify-content: center;
+    margin-top: 10px;
+    width: 325px;
+    height: 325px;
+  }
+  .cell {
+    width: 50px;
+    height: 50px;
+    background-color: #007acc;
+    border: 1px solid #005f99;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .cell.selected {
+    background-color: #005f99;
+  }
+  .cell.hit {
+    background-color: #ff4d4d;
+  }
+  .cell.miss {
+    background-color: #4d4d4d;
+  }
+  .cell.sunk {
+    background-color: #ffa31a;
+  }
+  /* Explosion Effect */
+  .explosion {
+    position: absolute;
+    top: -25px;
+    left: -25px;
+    width: 100px;
+    height: 100px;
+    background: url('https://i.imgur.com/6KZ4XJL.png') no-repeat center center;
+    background-size: contain;
+    animation: explode 0.5s ease-out forwards;
+    pointer-events: none;
+    z-index: 1;
+  }
+  @keyframes explode {
+    from {
+      transform: scale(0.1);
+      opacity: 1;
+    }
+    to {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+  /* Radar Effect */
+  #radar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 325px;
+    height: 325px;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  #radar-line {
+    position: absolute;
+    width: 325px;
+    height: 325px;
+    top: 0;
+    left: 0;
+    background: conic-gradient(from 0deg at 50% 50%, rgba(0, 255, 0, 0.3) 0deg, rgba(0, 255, 0, 0) 5deg);
+    transform-origin: center center;
+    display: none;
+  }
+  @keyframes radarSweep {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  /* Dashboard Shake Effect */
+  @keyframes shake {
+    0% { transform: translate(1px, 1px) rotate(0deg); }
+    10% { transform: translate(-1px, -2px) rotate(-1deg); }
+    20% { transform: translate(-3px, 0px) rotate(1deg); }
+    30% { transform: translate(3px, 2px) rotate(0deg); }
+    40% { transform: translate(1px, -1px) rotate(1deg); }
+    50% { transform: translate(-1px, 2px) rotate(-1deg); }
+    60% { transform: translate(-3px, 1px) rotate(0deg); }
+    70% { transform: translate(3px, 1px) rotate(-1deg); }
+    80% { transform: translate(-1px, -1px) rotate(1deg); }
+    90% { transform: translate(1px, 2px) rotate(0deg); }
+    100% { transform: translate(1px, -2px) rotate(-1deg); }
+  }
+  .shake {
+    animation: shake 0.5s;
+  }
+  /* Question and Feedback Areas */
+  #question-area h2, #feedback-area h2 {
+    margin-top: 0;
+  }
+  #question {
+    margin-bottom: 15px;
+  }
+  #answer {
+    width: calc(100% - 20px);
+    padding: 8px;
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+  #submit-answer-button {
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #007acc;
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  #submit-answer-button:hover {
+    background-color: #005f99;
+  }
+  #feedback {
+    margin-bottom: 10px;
+  }
+  #end-game-message {
+    font-size: 20px;
+    color: #00ff00;
+  }
+  #failure-message {
+    font-size: 20px;
+    color: #ff0000;
+  }
+  /* Celebration and Failure Overlays */
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    z-index: 10;
+  }
+  .overlay h2 {
+    color: #ffffff;
+    font-size: 36px;
+    margin-bottom: 20px;
+  }
+  /* Play Again Button */
+  .play-again-button {
+    padding: 15px 30px;
+    font-size: 18px;
+    background-color: #007acc;
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .play-again-button:hover {
+    background-color: #005f99;
+  }
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    #game-container {
+      flex-direction: column;
+      align-items: center;
+    }
+    #question-area, #grid-area, #feedback-area {
+      max-width: none;
+      width: 90%;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Performance Enablement Battleships</h1>
+
+<div id="instructions">
+  <h2>How to Play</h2>
+  <p>
+    Welcome to the Performance Enablement Battleships Game! Your mission is to sink all enemy ships hidden in the grid.
+  </p>
+  <ol>
+    <li>You will be presented with <strong id="total-questions">6</strong> questions, one at a time.</li>
+    <li>For each correct answer, you earn a salvo of <strong>three shots</strong>.</li>
+    <li>Select three targets on the grid; after your final selection, hits and misses will be revealed.</li>
+    <li>Ships are revealed only when they are completely sunk.</li>
+    <li>The game ends when you have answered all questions and used all your shots.</li>
+  </ol>
+  <p>Good luck, Commander!</p>
+  <button id="start-button" onclick="startGame()">Start Game</button>
+</div>
+
+<div id="dashboard">
+  <div id="game-container">
+    <div id="question-area" role="region" aria-label="Question Area">
+      <h2>Question <span id="current-question-number">1</span> of <span id="total-questions-display">6</span></h2>
+      <div id="question"></div>
+      <input type="text" id="answer" placeholder="Your answer" aria-label="Your answer">
+      <br>
+      <button id="submit-answer-button" onclick="submitAnswer()">Submit Answer</button>
+      <div id="scoreboard">
+        Correct Answers: <span id="correct-answers-count">0</span><br>
+        Incorrect Answers: <span id="incorrect-answers-count">0</span>
+      </div>
+    </div>
+    <div id="grid-area" role="region" aria-label="Enemy Waters">
+      <h2>Enemy Waters</h2>
+      <div id="grid">
+        <div id="radar-overlay">
+          <div id="radar-line"></div>
+        </div>
+      </div>
+    </div>
+    <div id="feedback-area" role="region" aria-label="Feedback Area">
+      <h2>Feedback</h2>
+      <div id="feedback"></div>
+      <div id="salvo-instructions"></div>
+    </div>
+  </div>
+</div>
+
+<div id="celebration" class="overlay">
+  <h2>Congratulations! You have sunk all enemy ships!</h2>
+  <button class="play-again-button" onclick="restartGame()">Play Again</button>
+</div>
+
+<div id="failure" class="overlay">
+  <h2 id="failure-message">Game Over.</h2>
+  <p id="failure-feedback"></p>
+  <button class="play-again-button" onclick="restartGame()">Try Again</button>
+</div>
+
+<script>
+  // Game Variables
+  let gridSize = 6;
+  let shipLengths = [3, 3];
+  let grid = [];
+  let ships = [];
+  let questions = [
+    { question: "Does Performance Enablement increase micromanagement?", answer: "no" },
+    { question: "Does Performance Enablement help to align goals?", answer: "yes" },
+    { question: "Does Performance Enablement help to empower teams?", answer: "yes" },
+    { question: "Does Performance Enablement slow innovation?", answer: "no" },
+    { question: "Does Performance Enablement boost retention?", answer: "yes" },
+    { question: "Is Performance Enablement about creating promotions for managers?", answer: "no" },
+  ];
+  let totalQuestions = questions.length;
+  let currentQuestionIndex = 0;
+  let shotsLeft = 0;
+  let totalShotsPerSalvo = 3;
+  let gameOver = false;
+  let correctAnswersCount = 0;
+  let incorrectAnswersCount = 0;
+  let selectedShots = [];
+
+  // Update Total Questions Display
+  document.getElementById('total-questions').innerText = totalQuestions;
+  document.getElementById('total-questions-display').innerText = totalQuestions;
+
+  // Start Game Function
+  function startGame() {
+    document.getElementById('instructions').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    initGame();
+  }
+
+  // Initialize Grid
+  function initializeGrid() {
+    grid = [];
+    for (let i = 0; i < gridSize; i++) {
+      grid[i] = [];
+      for (let j = 0; j < gridSize; j++) {
+        grid[i][j] = { hasShip: false, hit: false, element: null };
+      }
+    }
+  }
+
+  // Place Ships Randomly
+  function placeShips() {
+    ships = [];
+    shipLengths.forEach((length) => {
+      let placed = false;
+      while (!placed) {
+        let orientation = Math.random() < 0.5 ? 'H' : 'V';
+        let row = Math.floor(Math.random() * gridSize);
+        let col = Math.floor(Math.random() * gridSize);
+        let shipCells = [];
+
+        if (orientation === 'H' && col + length <= gridSize) {
+          for (let i = 0; i < length; i++) {
+            if (grid[row][col + i].hasShip) break;
+            shipCells.push({ row: row, col: col + i });
+          }
+        } else if (orientation === 'V' && row + length <= gridSize) {
+          for (let i = 0; i < length; i++) {
+            if (grid[row + i][col].hasShip) break;
+            shipCells.push({ row: row + i, col: col });
+          }
+        }
+
+        if (shipCells.length === length) {
+          shipCells.forEach((cell) => {
+            grid[cell.row][cell.col].hasShip = true;
+          });
+          ships.push({ cells: shipCells, sunk: false });
+          placed = true;
+        }
+      }
+    });
+  }
+
+  // Create Grid UI
+  function createGridUI() {
+    let gridElement = document.getElementById('grid');
+    gridElement.innerHTML = '<div id="radar-overlay"><div id="radar-line"></div></div>';
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
+        let cellElement = document.createElement('div');
+        cellElement.className = 'cell';
+        cellElement.dataset.row = i;
+        cellElement.dataset.col = j;
+        cellElement.setAttribute('role', 'button');
+        cellElement.setAttribute('tabindex', '0');
+        cellElement.setAttribute('aria-label', 'Grid cell ' + (i + 1) + ',' + (j + 1));
+        cellElement.addEventListener('click', () => selectShot(i, j));
+        cellElement.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            selectShot(i, j);
+          }
+        });
+        grid[i][j].element = cellElement;
+        gridElement.appendChild(cellElement);
+      }
+    }
+  }
+
+  // Display Current Question
+  function displayQuestion() {
+    if (currentQuestionIndex < questions.length) {
+      document.getElementById('current-question-number').innerText = currentQuestionIndex + 1;
+      document.getElementById('question').innerText = questions[currentQuestionIndex].question;
+      document.getElementById('answer').value = '';
+      document.getElementById('feedback').innerText = '';
+    } else {
+      document.getElementById('question-area').innerHTML = '<h2>All questions answered.</h2>';
+    }
+  }
+
+  // Submit Answer
+  function submitAnswer() {
+    if (currentQuestionIndex >= questions.length) return;
+    let userAnswer = document.getElementById('answer').value.trim().toLowerCase();
+    let correctAnswer = questions[currentQuestionIndex].answer.toLowerCase();
+    if (userAnswer === correctAnswer) {
+      shotsLeft = totalShotsPerSalvo;
+      correctAnswersCount++;
+      document.getElementById('correct-answers-count').innerText = correctAnswersCount;
+      document.getElementById('feedback').innerText = 'Correct! You have ' + shotsLeft + ' shots.';
+      document.getElementById('salvo-instructions').innerText = 'Select ' + shotsLeft + ' targets on the grid.';
+      selectedShots = [];
+    } else {
+      incorrectAnswersCount++;
+      document.getElementById('incorrect-answers-count').innerText = incorrectAnswersCount;
+      document.getElementById('feedback').innerText = 'Incorrect. The correct answer was: ' + questions[currentQuestionIndex].answer;
+      document.getElementById('salvo-instructions').innerText = '';
+      currentQuestionIndex++;
+      displayQuestion();
+    }
+  }
+
+  // Select Shot
+  function selectShot(row, col) {
+    if (shotsLeft <= 0 || gameOver) return;
+    let cell = grid[row][col];
+    let alreadySelected = selectedShots.some(shot => shot.row === row && shot.col === col);
+    if (alreadySelected) {
+      document.getElementById('feedback').innerText = 'You have already selected this location.';
+      return;
+    }
+    selectedShots.push({ row, col });
+    cell.element.classList.add('selected');
+    shotsLeft--;
+    document.getElementById('salvo-instructions').innerText = 'Select ' + shotsLeft + ' more target(s).';
+    if (shotsLeft === 0) {
+      setTimeout(() => {
+        revealShots();
+      }, 500);
+    }
+  }
+
+  // Reveal Shots with Radar Effect
+  function revealShots() {
+    let radarLine = document.getElementById('radar-line');
+
+    // Reset the animation
+    radarLine.style.animation = 'none';
+    radarLine.offsetWidth; // Trigger reflow
+    radarLine.style.animation = 'radarSweep 2s linear forwards';
+
+    radarLine.style.display = 'block';
+    radarLine.addEventListener('animationend', function handler() {
+      radarLine.style.display = 'none';
+      radarLine.removeEventListener('animationend', handler);
+      selectedShots.forEach(shot => {
+        let cell = grid[shot.row][shot.col];
+        cell.hit = true;
+        if (cell.hasShip) {
+          cell.element.classList.add('hit');
+          createExplosion(cell.element);
+          shakeDashboard();
+          checkForSunkShip(shot.row, shot.col);
+        } else {
+          cell.element.classList.add('miss');
+        }
+        cell.element.classList.remove('selected');
+      });
+      selectedShots = [];
+      shotsLeft = 0;
+      currentQuestionIndex++;
+      document.getElementById('salvo-instructions').innerText = '';
+      displayQuestion();
+      checkForWin();
+    });
+  }
+
+  // Create Explosion Effect
+  function createExplosion(cellElement) {
+    let explosion = document.createElement('div');
+    explosion.className = 'explosion';
+    cellElement.appendChild(explosion);
+    setTimeout(() => {
+      cellElement.removeChild(explosion);
+    }, 500);
+  }
+
+  // Shake Dashboard
+  function shakeDashboard() {
+    let dashboard = document.getElementById('dashboard');
+    dashboard.classList.add('shake');
+    setTimeout(() => {
+      dashboard.classList.remove('shake');
+    }, 500);
+  }
+
+  // Check if a Ship is Sunk
+  function checkForSunkShip(row, col) {
+    ships.forEach((ship) => {
+      if (ship.sunk) return;
+      let allHit = ship.cells.every((cell) => grid[cell.row][cell.col].hit);
+      if (allHit) {
+        ship.sunk = true;
+        ship.cells.forEach((cell) => {
+          grid[cell.row][cell.col].element.classList.add('sunk');
+        });
+        document.getElementById('feedback').innerText = 'You sunk a ship!';
+      }
+    });
+  }
+
+  // Check for Win Condition
+  function checkForWin() {
+    let allSunk = ships.every((ship) => ship.sunk);
+    if (allSunk) {
+      gameOver = true;
+      displayEndGameMessage('victory');
+    } else if (currentQuestionIndex >= questions.length && shotsLeft === 0) {
+      gameOver = true;
+      displayEndGameMessage('failure');
+    }
+  }
+
+  // Display End Game Message
+  function displayEndGameMessage(result) {
+    if (result === 'victory') {
+      document.getElementById('celebration').style.display = 'flex';
+    } else if (result === 'failure') {
+      let failureOverlay = document.getElementById('failure');
+      let failureFeedback = document.getElementById('failure-feedback');
+      failureFeedback.innerText = 'You answered ' + correctAnswersCount + ' out of ' + totalQuestions + ' questions correctly and sunk ' + countSunkShips() + ' out of ' + ships.length + ' ships.';
+      failureOverlay.style.display = 'flex';
+    }
+    document.getElementById('salvo-instructions').innerText = '';
+    document.getElementById('question-area').innerHTML = '';
+  }
+
+  // Count Sunk Ships
+  function countSunkShips() {
+    return ships.filter(ship => ship.sunk).length;
+  }
+
+  // Restart Game Function
+  function restartGame() {
+    location.reload();
+  }
+
+  // Initialize Game
+  function initGame() {
+    initializeGrid();
+    placeShips();
+    createGridUI();
+    correctAnswersCount = 0;
+    incorrectAnswersCount = 0;
+    currentQuestionIndex = 0;
+    gameOver = false;
+    document.getElementById('correct-answers-count').innerText = correctAnswersCount;
+    document.getElementById('incorrect-answers-count').innerText = incorrectAnswersCount;
+    document.getElementById('feedback').innerText = '';
+    document.getElementById('salvo-instructions').innerText = '';
+    displayQuestion();
+  }
+
+  // Accessibility: Focus Management
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Tab') {
+      let focusableElements = document.querySelectorAll('button, [href], input, [tabindex]:not([tabindex="-1"])');
+      let firstElement = focusableElements[0];
+      let lastElement = focusableElements[focusableElements.length - 1];
+
+      if (e.shiftKey) { // Backward Tab
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        }
+      } else { // Forward Tab
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    }
+  });
+</script>
+
+</body>
+</html>
